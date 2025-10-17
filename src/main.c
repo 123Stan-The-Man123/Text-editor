@@ -56,11 +56,12 @@ int main(void)
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
     
     // Event loop
-    for (;;) {
+    for (int running = 1; running;) {
         char c = getchar();
         switch (c) {
             case CTRL_Q:
-                return 0;
+                running = 0;
+                break;
             case CTRL_K:
                 printf(ERASE_LINE);
                 break;
