@@ -30,13 +30,94 @@ struct Node {
     struct Node* next;
 };
 
-int process_input(void);
-void process_escape(void);
-int enable_raw_mode(struct termios* orig_term, struct termios* raw);
-void disable_raw_mode(struct termios* orig_term);
+void process_input(void);
+void process_escape(int*, int*);
+int enable_raw_mode(struct termios*);
+void disable_raw_mode(struct termios*);
 
 int main(void)
 {
+    struct termios orig_term;
+    if (enable_raw_mode(&orig_term) == -1)
+        return 1;
+
+    process_input();
+
+    disable_raw_mode(&orig_term);
+
+    return 0;
+}
+
+void process_input(void)
+{
+    int cur_col = 0, cur_row = 0;
+    for (int running = 1; running;) {
+        char c = getc(stdin);
+        switch (c) {
+            case CTRL_Q:
+                running = 0;
+                break;
+            case CTRL_K:
+                printf(ERASE_LINE);
+                break;
+            case '\r':
+                printf("\r\n");
+                cur_row++;
+                cur_col = 0;
+                break;
+            case ESC:
+                process_escape(&cur_col, &cur_row);
+                break;
+            case BACK_SPACE:
+                printf("\b \b");
+                break;
+            default:
+                printf("%c", c);
+                break;
+        }
+    }
+}
+
+void process_escape(int* cur_col, int* cur_row)
+{
+    char c = getc(stdin);
+    if (c != '[') {
+        ungetc(c, stdin);
+        return ;
+    }
+
+    switch (getc(stdin)) {
+        case 'A':
+            printf(CURSOR_UP);
+            *cur_row -= (*cur_row > 0) ? 1 : 0;
+            break;
+        case 'B':
+            printf(CURSOR_DOWN);
+            (*cur_row)++;
+            break;
+        case 'C':
+            printf(CURSOR_RIGHT);
+            (*cur_col)++;
+            break;
+        case 'D':
+            printf(CURSOR_LEFT);
+            *cur_col -= (*cur_col > 0) ? 1 : 0;
+            break;
+    }
+}
+
+int enable_raw_mode(struct termios* orig_term)
+{
+    // Turns off the STDOUT buffer
+    setbuf(stdout, NULL);
+    printf(RESET_CURSOR ERASE_SCREEN);
+
+    // Return an error if tcgetattr fails
+    if (tcgetattr(STDIN_FILENO, orig_term) != 0) {
+        perror("tcgetattr");
+        return -1;
+    }
+
     /*
     struct termios {
         tcflag_t        c_iflag;        input flags
@@ -48,85 +129,13 @@ int main(void)
         speed_t         c_ospeed;       output speed
     };
     */
-    struct termios orig_term, raw;
-    if (enable_raw_mode(&orig_term, &raw) == -1)
-        return -1;
 
-    for (int running = 1; running;)
-        running = process_input();
-
-    disable_raw_mode(&orig_term);
-
-    return 0;
-}
-
-int process_input(void)
-{
-    char c = getc(stdin);
-    switch (c) {
-        case CTRL_Q:
-            return 0;
-        case CTRL_K:
-            printf(ERASE_LINE);
-            break;
-        case '\r':
-            printf("\r\n");
-            break;
-        case ESC:
-            process_escape();
-            break;
-        case BACK_SPACE:
-            printf("\b \b");
-            break;
-        default:
-            printf("%c", c);
-            break;
-    }
-
-    return 1;
-}
-
-void process_escape(void)
-{
-    char c = getc(stdin);
-    if (c != '[') {
-        ungetc(c, stdin);
-        return ;
-    }
-
-    switch (getc(stdin)) {
-        case 'A':
-            printf(CURSOR_UP);
-            break;
-        case 'B':
-            printf(CURSOR_DOWN);
-            break;
-        case 'C':
-            printf(CURSOR_RIGHT);
-            break;
-        case 'D':
-            printf(CURSOR_LEFT);
-            break;
-    }
-}
-
-int enable_raw_mode(struct termios* orig_term, struct termios* raw)
-{
-    // Turns off the STDOUT buffer
-    setbuf(stdout, NULL);
-    printf(RESET_CURSOR ERASE_SCREEN);
-
-    // Return an error if tcgetattr fails
-    if (tcgetattr(STDIN_FILENO, orig_term) != 0) {
-        perror("tcgetattr");
-        return -1;
-    }
     // Make a separate copy so the original settings are saved
-    *raw = *orig_term;
+    struct termios raw = *orig_term;
     
     // Enter raw mode
-    cfmakeraw(raw);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, raw);
+    cfmakeraw(&raw);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 
     return 0;
 }
