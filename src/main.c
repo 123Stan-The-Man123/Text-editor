@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -35,7 +36,8 @@ struct Node {
 
 int enable_raw_mode(struct termios*);
 void disable_raw_mode(struct termios*);
-struct Node* init_buffer(void);
+struct Node* init_node(char*);
+void add_node(struct Node*, char*, int);
 void free_buffer(struct Node*);
 void process_input(struct Node*);
 void process_escape(int*, int*);
@@ -44,7 +46,7 @@ int main(int argc, char **argv)
 {
     struct Node* buffer;
     if (argc == 1)
-        buffer = init_buffer();
+        buffer = init_node("Hello");
     else
         ; // TODO: Open file and load text into the linked list, or if the file does not exist, initialise empty linked list
 
@@ -102,23 +104,43 @@ void disable_raw_mode(struct termios* orig_term)
     printf(ERASE_SCREEN RESET_CURSOR);
 }
 
-struct Node* init_buffer(void)
+struct Node* init_node(char* s)
 {
     struct Node* node = malloc(sizeof(struct Node));
     if (node == NULL) {
         perror("Malloc failed.");
         return NULL;
     }
-    node->buffer.buff = malloc(sizeof(char) * INITIAL_LINE_SIZE);
+
+    node->buffer.len = strlen(s);
+    node->buffer.capacity = INITIAL_LINE_SIZE;
+    while (node->buffer.capacity <= node->buffer.len) {
+        node->buffer.capacity *= 2;
+    }
+    node->buffer.buff = malloc(sizeof(char) * node->buffer.capacity);
     if (node->buffer.buff == NULL) {
         perror("Malloc failed.");
         free(node);
         return NULL;
     }
-    node->buffer.len = 0;
-    node->buffer.capacity = INITIAL_LINE_SIZE;
+    strcpy(node->buffer.buff, s);
+
     node->next = NULL;
     return node;
+}
+
+void add_node(struct Node* node, char* s, int location)
+{
+    int i = 0;
+    while (node->next != NULL && i++ < location)
+        node = node->next;
+    if (node->next == NULL)
+        node->next = init_node(s);
+    else {
+        struct Node* temp = node->next;
+        node->next = init_node(s);
+        node->next->next = temp;
+    }
 }
 
 void free_buffer(struct Node* buffer)
@@ -145,6 +167,16 @@ void process_input(struct Node* buffer)
             case CTRL_K:
                 // TODO: Add buffer logic to remove a line from the linked list
                 printf(ERASE_LINE);
+                break;
+            case 20:
+                add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 10000);
+                struct Node* temp = buffer;
+                while (temp) {
+                    printf("%s\r\n", temp->buffer.buff);
+                    printf("%i\r\n", temp->buffer.capacity);
+                    temp = temp->next;
+                }
+                printf("\r\n");
                 break;
             case '\r':
                 // TODO: Add buffer logic to split line on a newline
