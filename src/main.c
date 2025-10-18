@@ -21,6 +21,10 @@
 #define ESC 27
 #define BACK_SPACE 127
 
+// Test codes (to be removed)
+#define CTRL_T 20
+#define CTRL_U 21
+
 #define INITIAL_LINE_SIZE 25
 
 struct Line {
@@ -37,7 +41,9 @@ struct Node {
 int enable_raw_mode(struct termios*);
 void disable_raw_mode(struct termios*);
 struct Node* init_node(char*);
-void add_node(struct Node*, char*, int);
+void free_node(struct Node*);
+struct Node* add_node(struct Node*, char*, int);
+struct Node* remove_node(struct Node*, int);
 void free_buffer(struct Node*);
 void process_input(struct Node*);
 void process_escape(int*, int*);
@@ -129,18 +135,58 @@ struct Node* init_node(char* s)
     return node;
 }
 
-void add_node(struct Node* node, char* s, int location)
+void free_node(struct Node* node)
+{
+    free(node->buffer.buff);
+    free(node);
+}
+
+struct Node* add_node(struct Node* node, char* s, int location)
 {
     int i = 0;
     while (node->next != NULL && i++ < location)
         node = node->next;
-    if (node->next == NULL)
+    if (location == 0) {
+        struct Node* temp = node;
+        node = init_node(s);
+        node->next = temp;
+    }
+    else if (node->next == NULL)
         node->next = init_node(s);
     else {
         struct Node* temp = node->next;
         node->next = init_node(s);
         node->next->next = temp;
     }
+    return node;
+}
+
+struct Node* remove_node(struct Node* node, int location)
+{
+    int i = 0;
+    struct Node* prev = node;
+    while (node->next != NULL && i < location) {
+        prev = node;
+        node = node->next;
+        i++;
+    }
+    if (node->next == NULL && location == 0)
+        ;
+    else if (location == 0 && node->next != NULL) {
+        node = node->next;
+        free_node(prev);
+    } else if (node->next == NULL && i > 0) {
+        prev->next = NULL;
+        free_node(node);
+        node = prev;
+    } else if (i > 0) {
+        prev->next = node->next;
+        free_node(node);
+        node = prev;
+    } else {
+        node->buffer.buff[0] = '\0';
+    }
+    return node;
 }
 
 void free_buffer(struct Node* buffer)
@@ -158,6 +204,9 @@ void free_buffer(struct Node* buffer)
 void process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0;
+    // Test variable (to be removed)
+    struct Node* temp;
+
     for (int running = 1; running;) {
         char c = getc(stdin);
         switch (c) {
@@ -168,12 +217,20 @@ void process_input(struct Node* buffer)
                 // TODO: Add buffer logic to remove a line from the linked list
                 printf(ERASE_LINE);
                 break;
-            case 20:
-                add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 10000);
-                struct Node* temp = buffer;
+            case CTRL_T:
+                buffer = add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 0);
+                temp = buffer;
                 while (temp) {
-                    printf("%s\r\n", temp->buffer.buff);
-                    printf("%i\r\n", temp->buffer.capacity);
+                    printf("%s\r\n%i\r\n", temp->buffer.buff, temp->buffer.capacity);
+                    temp = temp->next;
+                }
+                printf("\r\n");
+                break;
+            case CTRL_U:
+                remove_node(buffer, 1);
+                temp = buffer;
+                while (temp) {
+                    printf("%s\r\n%i\r\n", temp->buffer.buff, temp->buffer.capacity);
                     temp = temp->next;
                 }
                 printf("\r\n");
