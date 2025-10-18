@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <termios.h>
 #include <unistd.h>
@@ -19,91 +20,45 @@
 #define ESC 27
 #define BACK_SPACE 127
 
+#define INITIAL_LINE_SIZE 25
+
 struct Line {
     char* buff;
     int len;
+    int capacity;
 };
 
 struct Node {
-    struct Node* prev;
     struct Line buffer;
     struct Node* next;
 };
 
-void process_input(void);
-void process_escape(int*, int*);
 int enable_raw_mode(struct termios*);
 void disable_raw_mode(struct termios*);
+struct Node* init_buffer(void);
+void free_buffer(struct Node*);
+void process_input(struct Node*);
+void process_escape(int*, int*);
 
-int main(void)
+int main(int argc, char **argv)
 {
+    struct Node* buffer;
+    if (argc == 1)
+        buffer = init_buffer();
+    else
+        ; // TODO: Open file and load text into the linked list, or if the file does not exist, initialise empty linked list
+
     struct termios orig_term;
     if (enable_raw_mode(&orig_term) == -1)
         return 1;
 
-    process_input();
+    process_input(buffer);
 
     disable_raw_mode(&orig_term);
 
+    free_buffer(buffer);
+
     return 0;
-}
-
-void process_input(void)
-{
-    int cur_col = 0, cur_row = 0;
-    for (int running = 1; running;) {
-        char c = getc(stdin);
-        switch (c) {
-            case CTRL_Q:
-                running = 0;
-                break;
-            case CTRL_K:
-                printf(ERASE_LINE);
-                break;
-            case '\r':
-                printf("\r\n");
-                cur_row++;
-                cur_col = 0;
-                break;
-            case ESC:
-                process_escape(&cur_col, &cur_row);
-                break;
-            case BACK_SPACE:
-                printf("\b \b");
-                break;
-            default:
-                printf("%c", c);
-                break;
-        }
-    }
-}
-
-void process_escape(int* cur_col, int* cur_row)
-{
-    char c = getc(stdin);
-    if (c != '[') {
-        ungetc(c, stdin);
-        return ;
-    }
-
-    switch (getc(stdin)) {
-        case 'A':
-            printf(CURSOR_UP);
-            *cur_row -= (*cur_row > 0) ? 1 : 0;
-            break;
-        case 'B':
-            printf(CURSOR_DOWN);
-            (*cur_row)++;
-            break;
-        case 'C':
-            printf(CURSOR_RIGHT);
-            (*cur_col)++;
-            break;
-        case 'D':
-            printf(CURSOR_LEFT);
-            *cur_col -= (*cur_col > 0) ? 1 : 0;
-            break;
-    }
 }
 
 int enable_raw_mode(struct termios* orig_term)
@@ -145,4 +100,99 @@ void disable_raw_mode(struct termios* orig_term)
     // Reset terminal to default settings
     tcsetattr(STDIN_FILENO, TCSAFLUSH, orig_term);
     printf(ERASE_SCREEN RESET_CURSOR);
+}
+
+struct Node* init_buffer(void)
+{
+    struct Node* node = malloc(sizeof(struct Node));
+    if (node == NULL) {
+        perror("Malloc failed.");
+        return NULL;
+    }
+    node->buffer.buff = malloc(sizeof(char) * INITIAL_LINE_SIZE);
+    if (node->buffer.buff == NULL) {
+        perror("Malloc failed.");
+        free(node);
+        return NULL;
+    }
+    node->buffer.len = 0;
+    node->buffer.capacity = INITIAL_LINE_SIZE;
+    node->next = NULL;
+    return node;
+}
+
+void free_buffer(struct Node* buffer)
+{
+    struct Node* temp;
+
+    while (buffer != NULL) {
+        temp = buffer;
+        buffer = buffer->next;
+        free(temp->buffer.buff);
+        free(temp);
+    }
+}
+
+void process_input(struct Node* buffer)
+{
+    int cur_col = 0, cur_row = 0;
+    for (int running = 1; running;) {
+        char c = getc(stdin);
+        switch (c) {
+            case CTRL_Q:
+                running = 0;
+                break;
+            case CTRL_K:
+                // TODO: Add buffer logic to remove a line from the linked list
+                printf(ERASE_LINE);
+                break;
+            case '\r':
+                // TODO: Add buffer logic to split line on a newline
+                printf("\r\n");
+                cur_row++;
+                cur_col = 0;
+                break;
+            case ESC:
+                process_escape(&cur_col, &cur_row);
+                break;
+            case BACK_SPACE:
+                // TODO: Add buffer logic to synchronise pointer location
+                printf("\b \b");
+                cur_col -= (cur_col > 0) ? 1 : 0;
+                break;
+            default:
+                // TODO: Add buffer logic to store characters
+                printf("%c", c);
+                break;
+        }
+    }
+}
+
+void process_escape(int* cur_col, int* cur_row)
+{
+    char c = getc(stdin);
+    if (c != '[') {
+        ungetc(c, stdin);
+        return ;
+    }
+
+    // TODO: Add buffer logic to synchronise pointer location
+    switch (getc(stdin)) {
+        case 'A':
+            printf(CURSOR_UP);
+            *cur_row -= (*cur_row > 0) ? 1 : 0;
+            break;
+        case 'B':
+            printf(CURSOR_DOWN);
+            (*cur_row)++;
+            break;
+        case 'C':
+            printf(CURSOR_RIGHT);
+            (*cur_col)++;
+            break;
+        case 'D':
+            printf(CURSOR_LEFT);
+            *cur_col -= (*cur_col > 0) ? 1 : 0;
+            break;
+    }
 }
