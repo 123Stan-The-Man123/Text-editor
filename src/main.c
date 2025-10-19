@@ -47,13 +47,13 @@ struct Node* remove_node(struct Node*, int);
 void free_buffer(struct Node*);
 int count_lines(struct Node*);
 struct Node* get_line(struct Node*, int);
-int get_line_len(struct Node*, int);
 void increase_line_capacity(struct Node*);
 void shift_right(struct Node*, int);
 void add_char(struct Node*, int*, char);
 void print_lines(struct Node*, int, int);
+void align_cur(int cur_col, int cur_row);
 struct Node* process_input(struct Node*);
-void process_escape(struct Node*, int*, int*, int, int, struct Node**);
+void process_escape(struct Node*, int*, int*, int, struct Node**);
 
 int main(int argc, char **argv)
 {
@@ -227,13 +227,6 @@ struct Node* get_line(struct Node* buffer, int line_number)
     return buffer;
 }
 
-int get_line_len(struct Node* buffer, int cur_row)
-{
-    for (int i = 0; i < cur_row; i++)
-        buffer = buffer->next;
-    return buffer->buffer.len;
-}
-
 void increase_line_capacity(struct Node* line)
 {
     line->buffer.capacity *= 2;
@@ -266,13 +259,31 @@ void add_char(struct Node* line, int* cur_col, char c)
 
 void print_lines(struct Node* buffer, int start, int end)
 {
-    int i = (start >= 0) ? start : 0;
+    printf(ERASE_SCREEN RESET_CURSOR);
+
+    int i;
+    if (start >= 0)
+        for (; i < start; i++)
+            buffer = buffer->next;
+    else
+        i = 0;
+
     for (; i < end && buffer != NULL; i++) {
         printf("%s", buffer->buffer.buff);
         buffer = buffer->next;
         if (buffer != NULL)
             printf("\r\n");
     }
+}
+
+void align_cur(int cur_col, int cur_row)
+{
+    printf(RESET_CURSOR);
+
+    for (; cur_col > 0; cur_col--)
+        printf(CURSOR_RIGHT);
+    for(; cur_row > 0; cur_row--)
+        printf(CURSOR_DOWN);
 }
 
 struct Node* process_input(struct Node* buffer)
@@ -285,7 +296,6 @@ struct Node* process_input(struct Node* buffer)
     for (int running = 1; running;) {
         char c = getc(stdin);
         int line_count = count_lines(buffer);
-        int line_len = get_line_len(buffer, cur_row);
         switch (c) {
             case CTRL_Q:
                 running = 0;
@@ -319,7 +329,7 @@ struct Node* process_input(struct Node* buffer)
                 cur_col = 0;
                 break;
             case ESC:
-                process_escape(buffer, &cur_col, &cur_row, line_count, line_len, &cur_line);
+                process_escape(buffer, &cur_col, &cur_row, line_count, &cur_line);
                 break;
             case BACK_SPACE:
                 // TODO: Add buffer logic to synchronise pointer location
@@ -329,15 +339,15 @@ struct Node* process_input(struct Node* buffer)
             default:
                 // TODO: Add buffer logic to store characters
                 add_char(cur_line, &cur_col, c);
-                printf(ERASE_SCREEN RESET_CURSOR);
-                print_lines(buffer, cur_row-10, cur_row+10);
+                print_lines(buffer, cur_row-5, cur_row+5);
+                align_cur(cur_col, cur_row);
                 break;
         }
     }
     return buffer;
 }
 
-void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_count, int line_len, struct Node** cur_line)
+void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_count, struct Node** cur_line)
 {
     char c = getc(stdin);
     if (c != '[') {
@@ -362,7 +372,7 @@ void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_co
             }
             break;
         case 'C':
-            if (*cur_col < line_len-1) {
+            if (*cur_col < (*cur_line)->buffer.len-1) {
                 printf(CURSOR_RIGHT);
                 (*cur_col)++;
             }
