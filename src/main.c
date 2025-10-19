@@ -51,6 +51,7 @@ int get_line_len(struct Node*, int);
 void increase_line_capacity(struct Node*);
 void shift_right(struct Node*, int);
 void add_char(struct Node*, int*, char);
+void print_lines(struct Node*, int, int);
 struct Node* process_input(struct Node*);
 void process_escape(struct Node*, int*, int*, int, int, struct Node**);
 
@@ -263,6 +264,17 @@ void add_char(struct Node* line, int* cur_col, char c)
     line->buffer.len++;
 }
 
+void print_lines(struct Node* buffer, int start, int end)
+{
+    int i = (start >= 0) ? start : 0;
+    for (; i < end && buffer != NULL; i++) {
+        printf("%s", buffer->buffer.buff);
+        buffer = buffer->next;
+        if (buffer != NULL)
+            printf("\r\n");
+    }
+}
+
 struct Node* process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0;
@@ -318,7 +330,7 @@ struct Node* process_input(struct Node* buffer)
                 // TODO: Add buffer logic to store characters
                 add_char(cur_line, &cur_col, c);
                 printf(ERASE_SCREEN RESET_CURSOR);
-                printf("%s", cur_line->buffer.buff);
+                print_lines(buffer, cur_row-10, cur_row+10);
                 break;
         }
     }
