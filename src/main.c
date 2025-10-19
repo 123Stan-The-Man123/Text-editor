@@ -45,8 +45,11 @@ void free_node(struct Node*);
 struct Node* add_node(struct Node*, char*, int);
 struct Node* remove_node(struct Node*, int);
 void free_buffer(struct Node*);
-void process_input(struct Node*);
-void process_escape(int*, int*);
+int count_lines(struct Node*);
+struct Node* get_line(struct Node*, int);
+int get_line_len(struct Node*, int);
+struct Node* process_input(struct Node*);
+void process_escape(struct Node*, int*, int*, int, int, struct Node**);
 
 int main(int argc, char **argv)
 {
@@ -60,7 +63,7 @@ int main(int argc, char **argv)
     if (enable_raw_mode(&orig_term) == -1)
         return 1;
 
-    process_input(buffer);
+    buffer = process_input(buffer);
 
     disable_raw_mode(&orig_term);
 
@@ -144,19 +147,24 @@ void free_node(struct Node* node)
 struct Node* add_node(struct Node* node, char* s, int location)
 {
     int i = 0;
-    while (node->next != NULL && i++ < location)
+    while (node->next != NULL && i < location) {
         node = node->next;
-    if (location == 0) {
+        i++;
+    }
+    if (i == 0) {
         struct Node* temp = node;
         node = init_node(s);
         node->next = temp;
     }
-    else if (node->next == NULL)
+    else if (node->next == NULL) {
         node->next = init_node(s);
+        node = node->next;
+    }
     else {
         struct Node* temp = node->next;
         node->next = init_node(s);
-        node->next->next = temp;
+        node = node->next;
+        node->next = temp;
     }
     return node;
 }
@@ -170,9 +178,10 @@ struct Node* remove_node(struct Node* node, int location)
         node = node->next;
         i++;
     }
-    if (node->next == NULL && location == 0)
-        ;
-    else if (location == 0 && node->next != NULL) {
+    if (node->next == NULL && i == 0) {
+        node->buffer.buff[0] = '\0';
+        node->buffer.len = 0;
+    } else if (location == 0 && node->next != NULL) {
         node = node->next;
         free_node(prev);
     } else if (node->next == NULL && i > 0) {
@@ -183,8 +192,6 @@ struct Node* remove_node(struct Node* node, int location)
         prev->next = node->next;
         free_node(node);
         node = prev;
-    } else {
-        node->buffer.buff[0] = '\0';
     }
     return node;
 }
@@ -196,19 +203,46 @@ void free_buffer(struct Node* buffer)
     while (buffer != NULL) {
         temp = buffer;
         buffer = buffer->next;
-        free(temp->buffer.buff);
-        free(temp);
+        free_node(temp);
     }
 }
 
-void process_input(struct Node* buffer)
+int count_lines(struct Node* buffer)
+{
+    int count = 0;
+
+    while (buffer != NULL) {
+        buffer = buffer->next;
+        count++;
+    }
+    return count;
+}
+
+struct Node* get_line(struct Node* buffer, int line_number)
+{
+    for (int i = 0; i < line_number; i++)
+        buffer = buffer->next;
+    return buffer;
+}
+
+int get_line_len(struct Node* buffer, int cur_row)
+{
+    for (int i = 0; i < cur_row; i++)
+        buffer = buffer->next;
+    return buffer->buffer.len;
+}
+
+struct Node* process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0;
+    struct Node* cur_line = get_line(buffer, cur_row);
     // Test variable (to be removed)
     struct Node* temp;
 
     for (int running = 1; running;) {
         char c = getc(stdin);
+        int line_count = count_lines(buffer);
+        int line_len = get_line_len(buffer, cur_row);
         switch (c) {
             case CTRL_Q:
                 running = 0;
@@ -242,7 +276,7 @@ void process_input(struct Node* buffer)
                 cur_col = 0;
                 break;
             case ESC:
-                process_escape(&cur_col, &cur_row);
+                process_escape(buffer, &cur_col, &cur_row, line_count, line_len, &cur_line);
                 break;
             case BACK_SPACE:
                 // TODO: Add buffer logic to synchronise pointer location
@@ -255,9 +289,10 @@ void process_input(struct Node* buffer)
                 break;
         }
     }
+    return buffer;
 }
 
-void process_escape(int* cur_col, int* cur_row)
+void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_count, int line_len, struct Node** cur_line)
 {
     char c = getc(stdin);
     if (c != '[') {
@@ -268,16 +303,24 @@ void process_escape(int* cur_col, int* cur_row)
     // TODO: Add buffer logic to synchronise pointer location
     switch (getc(stdin)) {
         case 'A':
-            printf(CURSOR_UP);
-            *cur_row -= (*cur_row > 0) ? 1 : 0;
+            if (*cur_row > 0) {
+                printf(CURSOR_UP);
+                (*cur_row)--;
+                *cur_line = get_line(buffer, *cur_row);
+            }
             break;
         case 'B':
-            printf(CURSOR_DOWN);
-            (*cur_row)++;
+            if (*cur_row < line_count-1) {
+                printf(CURSOR_DOWN);
+                (*cur_row)++;
+                *cur_line = get_line(buffer, *cur_row);
+            }
             break;
         case 'C':
-            printf(CURSOR_RIGHT);
-            (*cur_col)++;
+            if (*cur_col < line_len-1) {
+                printf(CURSOR_RIGHT);
+                (*cur_col)++;
+            }
             break;
         case 'D':
             printf(CURSOR_LEFT);
