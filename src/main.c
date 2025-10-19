@@ -48,8 +48,10 @@ void free_buffer(struct Node*);
 int count_lines(struct Node*);
 struct Node* get_line(struct Node*, int);
 void increase_line_capacity(struct Node*);
+void shift_left(struct Node*, int);
 void shift_right(struct Node*, int);
 void add_char(struct Node*, int*, char);
+void remove_char(struct Node*, int*);
 void print_lines(struct Node*, int, int);
 void align_cur(int, int, int);
 struct Node* process_input(struct Node*);
@@ -233,11 +235,16 @@ void increase_line_capacity(struct Node* line)
     line->buffer.buff = realloc(line->buffer.buff, sizeof(char) * line->buffer.capacity);
 }
 
+void shift_left(struct Node* line, int cur_col)
+{
+    for (int i = cur_col; i <= line->buffer.len; i++)
+        line->buffer.buff[i] = line->buffer.buff[i+1];
+}
+
 void shift_right(struct Node* line, int cur_col)
 {
-    for (int i = line->buffer.len; i >= cur_col; i--) {
+    for (int i = line->buffer.len; i >= cur_col; i--)
         line->buffer.buff[i+1] = line->buffer.buff[i];
-    }
 }
 
 void add_char(struct Node* line, int* cur_col, char c)
@@ -254,6 +261,18 @@ void add_char(struct Node* line, int* cur_col, char c)
     }
 
     line->buffer.len++;
+}
+
+void remove_char(struct Node* line, int* cur_col)
+{
+    if (*cur_col <= 0)
+        return ;
+
+    if (*cur_col == line->buffer.len)
+        line->buffer.buff[--(*cur_col)] = '\0';
+    else
+        shift_left(line, --(*cur_col));
+    line->buffer.len--;
 }
 
 void print_lines(struct Node* buffer, int start, int end)
@@ -316,9 +335,9 @@ struct Node* process_input(struct Node* buffer)
                 process_escape(buffer, &cur_col, &cur_row, &view_port_top, &view_port_bottom, line_count, &cur_line);
                 break;
             case BACK_SPACE:
-                // TODO: Add buffer logic to synchronise pointer location
-                printf("\b \b");
-                cur_col -= (cur_col > 0) ? 1 : 0;
+                remove_char(cur_line, &cur_col);
+                print_lines(buffer, view_port_top, view_port_bottom);
+                align_cur(cur_col, cur_row, view_port_top);
                 break;
             default:
                 add_char(cur_line, &cur_col, c);
