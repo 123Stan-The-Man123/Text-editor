@@ -48,6 +48,9 @@ void free_buffer(struct Node*);
 int count_lines(struct Node*);
 struct Node* get_line(struct Node*, int);
 int get_line_len(struct Node*, int);
+void increase_line_capacity(struct Node*);
+void shift_right(struct Node*, int);
+void add_char(struct Node*, int*, char);
 struct Node* process_input(struct Node*);
 void process_escape(struct Node*, int*, int*, int, int, struct Node**);
 
@@ -55,7 +58,7 @@ int main(int argc, char **argv)
 {
     struct Node* buffer;
     if (argc == 1)
-        buffer = init_node("Hello");
+        buffer = init_node("\0");
     else
         ; // TODO: Open file and load text into the linked list, or if the file does not exist, initialise empty linked list
 
@@ -151,20 +154,18 @@ struct Node* add_node(struct Node* node, char* s, int location)
         node = node->next;
         i++;
     }
-    if (i == 0) {
+    if (i == 0 && node->next != NULL) {
         struct Node* temp = node;
         node = init_node(s);
         node->next = temp;
-    }
-    else if (node->next == NULL) {
-        node->next = init_node(s);
-        node = node->next;
-    }
-    else {
+    } else if (i == location && node->next != NULL) {
         struct Node* temp = node->next;
         node->next = init_node(s);
         node = node->next;
         node->next = temp;
+    } else if (node->next == NULL) {
+        node->next = init_node(s);
+        node = node->next;
     }
     return node;
 }
@@ -232,6 +233,36 @@ int get_line_len(struct Node* buffer, int cur_row)
     return buffer->buffer.len;
 }
 
+void increase_line_capacity(struct Node* line)
+{
+    line->buffer.capacity *= 2;
+    line->buffer.buff = realloc(line->buffer.buff, sizeof(char) * line->buffer.capacity);
+}
+
+void shift_right(struct Node* line, int cur_col)
+{
+    for (int i = line->buffer.len; i >= cur_col; i--) {
+        line->buffer.buff[i+1] = line->buffer.buff[i];
+    }
+}
+
+void add_char(struct Node* line, int* cur_col, char c)
+{
+    if ((*cur_col + 1) >= line->buffer.capacity)
+        increase_line_capacity(line);
+
+    if (*cur_col == line->buffer.len) {
+        printf("test");
+        line->buffer.buff[(*cur_col)++] = c;
+        line->buffer.buff[*cur_col] = '\0';
+    } else {
+        shift_right(line, *cur_col);
+        line->buffer.buff[(*cur_col)++] = c;
+    }
+
+    line->buffer.len++;
+}
+
 struct Node* process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0;
@@ -251,8 +282,8 @@ struct Node* process_input(struct Node* buffer)
                 // TODO: Add buffer logic to remove a line from the linked list
                 printf(ERASE_LINE);
                 break;
-            case CTRL_T:
-                buffer = add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 0);
+            /*case CTRL_T:
+                add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 1);
                 temp = buffer;
                 while (temp) {
                     printf("%s\r\n%i\r\n", temp->buffer.buff, temp->buffer.capacity);
@@ -268,11 +299,11 @@ struct Node* process_input(struct Node* buffer)
                     temp = temp->next;
                 }
                 printf("\r\n");
-                break;
+                break;*/
             case '\r':
                 // TODO: Add buffer logic to split line on a newline
                 printf("\r\n");
-                cur_row++;
+                cur_line = add_node(buffer, "\0", ++cur_row);
                 cur_col = 0;
                 break;
             case ESC:
@@ -285,7 +316,9 @@ struct Node* process_input(struct Node* buffer)
                 break;
             default:
                 // TODO: Add buffer logic to store characters
-                printf("%c", c);
+                add_char(cur_line, &cur_col, c);
+                printf(ERASE_SCREEN RESET_CURSOR);
+                printf("%s", cur_line->buffer.buff);
                 break;
         }
     }
