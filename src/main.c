@@ -51,9 +51,9 @@ void increase_line_capacity(struct Node*);
 void shift_right(struct Node*, int);
 void add_char(struct Node*, int*, char);
 void print_lines(struct Node*, int, int);
-void align_cur(int cur_col, int cur_row);
+void align_cur(int, int, int);
 struct Node* process_input(struct Node*);
-void process_escape(struct Node*, int*, int*, int, struct Node**);
+void process_escape(struct Node*, int*, int*, int*, int*, int, struct Node**);
 
 int main(int argc, char **argv)
 {
@@ -246,7 +246,6 @@ void add_char(struct Node* line, int* cur_col, char c)
         increase_line_capacity(line);
 
     if (*cur_col == line->buffer.len) {
-        printf("test");
         line->buffer.buff[(*cur_col)++] = c;
         line->buffer.buff[*cur_col] = '\0';
     } else {
@@ -261,34 +260,32 @@ void print_lines(struct Node* buffer, int start, int end)
 {
     printf(ERASE_SCREEN RESET_CURSOR);
 
-    int i;
-    if (start >= 0)
+    int i= 0;
+    if (start > 0)
         for (; i < start; i++)
             buffer = buffer->next;
-    else
-        i = 0;
 
-    for (; i < end && buffer != NULL; i++) {
+    do {
         printf("%s", buffer->buffer.buff);
         buffer = buffer->next;
         if (buffer != NULL)
             printf("\r\n");
-    }
+    } while (++i < end && buffer != NULL);
 }
 
-void align_cur(int cur_col, int cur_row)
+void align_cur(int cur_col, int cur_row, int view_port_top)
 {
     printf(RESET_CURSOR);
 
     for (; cur_col > 0; cur_col--)
         printf(CURSOR_RIGHT);
-    for(; cur_row > 0; cur_row--)
+    for(; cur_row > view_port_top; cur_row--)
         printf(CURSOR_DOWN);
 }
 
 struct Node* process_input(struct Node* buffer)
 {
-    int cur_col = 0, cur_row = 0;
+    int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = 28;
     struct Node* cur_line = get_line(buffer, cur_row);
     // Test variable (to be removed)
     struct Node* temp;
@@ -304,32 +301,19 @@ struct Node* process_input(struct Node* buffer)
                 // TODO: Add buffer logic to remove a line from the linked list
                 printf(ERASE_LINE);
                 break;
-            /*case CTRL_T:
-                add_node(buffer, "Test is really long in order to see if the capacity changes or not.", 1);
-                temp = buffer;
-                while (temp) {
-                    printf("%s\r\n%i\r\n", temp->buffer.buff, temp->buffer.capacity);
-                    temp = temp->next;
-                }
-                printf("\r\n");
-                break;
-            case CTRL_U:
-                remove_node(buffer, 1);
-                temp = buffer;
-                while (temp) {
-                    printf("%s\r\n%i\r\n", temp->buffer.buff, temp->buffer.capacity);
-                    temp = temp->next;
-                }
-                printf("\r\n");
-                break;*/
             case '\r':
                 // TODO: Add buffer logic to split line on a newline
                 printf("\r\n");
                 cur_line = add_node(buffer, "\0", ++cur_row);
                 cur_col = 0;
+                if (view_port_bottom - cur_row < 5 && view_port_bottom <= line_count) {
+                    view_port_top++;
+                    view_port_bottom++;
+                    print_lines(buffer, view_port_top, view_port_bottom);
+                }
                 break;
             case ESC:
-                process_escape(buffer, &cur_col, &cur_row, line_count, &cur_line);
+                process_escape(buffer, &cur_col, &cur_row, &view_port_top, &view_port_bottom, line_count, &cur_line);
                 break;
             case BACK_SPACE:
                 // TODO: Add buffer logic to synchronise pointer location
@@ -337,17 +321,16 @@ struct Node* process_input(struct Node* buffer)
                 cur_col -= (cur_col > 0) ? 1 : 0;
                 break;
             default:
-                // TODO: Add buffer logic to store characters
                 add_char(cur_line, &cur_col, c);
-                print_lines(buffer, cur_row-5, cur_row+5);
-                align_cur(cur_col, cur_row);
+                print_lines(buffer, view_port_top, view_port_bottom);
+                align_cur(cur_col, cur_row, view_port_top);
                 break;
         }
     }
     return buffer;
 }
 
-void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_count, struct Node** cur_line)
+void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int* view_port_top, int* view_port_bottom, int line_count, struct Node** cur_line)
 {
     char c = getc(stdin);
     if (c != '[') {
@@ -355,13 +338,18 @@ void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_co
         return ;
     }
 
-    // TODO: Add buffer logic to synchronise pointer location
     switch (getc(stdin)) {
         case 'A':
             if (*cur_row > 0) {
                 printf(CURSOR_UP);
                 (*cur_row)--;
                 *cur_line = get_line(buffer, *cur_row);
+            }
+            if (*cur_row - *view_port_top < 5 && *view_port_top > 0) {
+                (*view_port_top)--;
+                (*view_port_bottom)--;
+                print_lines(buffer, *view_port_top, *view_port_bottom);
+                align_cur(*cur_col, *cur_row, *view_port_top);
             }
             break;
         case 'B':
@@ -370,9 +358,15 @@ void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int line_co
                 (*cur_row)++;
                 *cur_line = get_line(buffer, *cur_row);
             }
+            if (*view_port_bottom - *cur_row < 5 && *view_port_bottom < line_count) {
+                (*view_port_top)++;
+                (*view_port_bottom)++;
+                print_lines(buffer, *view_port_top, *view_port_bottom);
+                align_cur(*cur_col, *cur_row, *view_port_top);
+            }
             break;
         case 'C':
-            if (*cur_col < (*cur_line)->buffer.len-1) {
+            if (*cur_col < (*cur_line)->buffer.len) {
                 printf(CURSOR_RIGHT);
                 (*cur_col)++;
             }
