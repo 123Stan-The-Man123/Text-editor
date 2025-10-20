@@ -158,11 +158,7 @@ struct Node* add_node(struct Node* node, char* s, int location)
         node = node->next;
         i++;
     }
-    if (i == 0 && node->next != NULL) {
-        struct Node* temp = node;
-        node = init_node(s);
-        node->next = temp;
-    } else if (i == location && node->next != NULL) {
+    if (node->next != NULL) {
         struct Node* temp = node->next;
         node->next = init_node(s);
         node = node->next;
@@ -327,8 +323,10 @@ struct Node* process_input(struct Node* buffer)
                 running = 0;
                 break;
             case CTRL_K:
-                if (cur_row == 0)
+                if (cur_row == 0) {
                     buffer = remove_node(buffer, cur_row);
+                    cur_col = 0;
+                }
                 else
                     remove_node(buffer, cur_row);
                 if (cur_row == line_count-1 && cur_row > 0)
@@ -337,8 +335,8 @@ struct Node* process_input(struct Node* buffer)
                 align_cur(cur_col, cur_row, view_port_top);
                 break;
             case '\r':
-                printf("\r\n");
-                cur_line = add_node(buffer, split_line(cur_line, cur_col, new_line), ++cur_row);
+                cur_line = add_node(buffer, split_line(cur_line, cur_col, new_line), cur_row);
+                cur_row++;
                 cur_col = 0;
                 if (view_port_bottom - cur_row < 5 && view_port_bottom <= line_count) {
                     view_port_top++;
@@ -351,7 +349,11 @@ struct Node* process_input(struct Node* buffer)
                 process_escape(buffer, &cur_col, &cur_row, &view_port_top, &view_port_bottom, line_count, &cur_line);
                 break;
             case BACK_SPACE:
-                remove_char(cur_line, &cur_col);
+                if (cur_line->buffer.len == 0 && cur_row > 0) {
+                    cur_line = remove_node(buffer, cur_row--);
+                    cur_col = cur_line->buffer.len;
+                } else
+                    remove_char(cur_line, &cur_col);
                 print_lines(buffer, view_port_top, view_port_bottom);
                 align_cur(cur_col, cur_row, view_port_top);
                 break;
