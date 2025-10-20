@@ -16,7 +16,7 @@
 #define ERASE_SCREEN "\033[2J"
 
 // ASCII codes
-#define CTRL_K 11
+#define CTRL_D 4
 #define CTRL_Q 17
 #define ESC 27
 #define BACK_SPACE 127
@@ -322,13 +322,15 @@ struct Node* process_input(struct Node* buffer)
             case CTRL_Q:
                 running = 0;
                 break;
-            case CTRL_K:
-                if (cur_row == 0) {
+            case CTRL_D:
+                if (cur_row == 0 && cur_line->next != NULL) {
                     buffer = remove_node(buffer, cur_row);
-                    cur_col = 0;
-                }
-                else
+                    cur_line = buffer;
+                } else if (cur_row == 0) {
                     remove_node(buffer, cur_row);
+                    cur_col = 0;
+                } else
+                    cur_line = remove_node(buffer, cur_row);
                 if (cur_row == line_count-1 && cur_row > 0)
                     cur_row--;
                 print_lines(buffer, view_port_top, view_port_bottom);
