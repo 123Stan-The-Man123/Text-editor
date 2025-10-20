@@ -54,6 +54,7 @@ void add_char(struct Node*, int*, char);
 void remove_char(struct Node*, int*);
 void print_lines(struct Node*, int, int);
 void align_cur(int, int, int);
+char* split_line(struct Node*, int, char*);
 struct Node* process_input(struct Node*);
 void process_escape(struct Node*, int*, int*, int*, int*, int, struct Node**);
 
@@ -302,6 +303,14 @@ void align_cur(int cur_col, int cur_row, int view_port_top)
         printf(CURSOR_DOWN);
 }
 
+char* split_line(struct Node* line, int cur_col, char* new_line)
+{
+    strcpy(new_line, &line->buffer.buff[cur_col]);
+    line->buffer.buff[cur_col] = '\0';
+    line->buffer.len = cur_col;
+    return new_line;
+}
+
 struct Node* process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = 28;
@@ -311,6 +320,7 @@ struct Node* process_input(struct Node* buffer)
 
     for (int running = 1; running;) {
         char c = getc(stdin);
+        char new_line[cur_line->buffer.len];
         int line_count = count_lines(buffer);
         switch (c) {
             case CTRL_Q:
@@ -321,15 +331,15 @@ struct Node* process_input(struct Node* buffer)
                 printf(ERASE_LINE);
                 break;
             case '\r':
-                // TODO: Add buffer logic to split line on a newline
                 printf("\r\n");
-                cur_line = add_node(buffer, "\0", ++cur_row);
+                cur_line = add_node(buffer, split_line(cur_line, cur_col, new_line), ++cur_row);
                 cur_col = 0;
                 if (view_port_bottom - cur_row < 5 && view_port_bottom <= line_count) {
                     view_port_top++;
                     view_port_bottom++;
-                    print_lines(buffer, view_port_top, view_port_bottom);
                 }
+                print_lines(buffer, view_port_top, view_port_bottom);
+                align_cur(cur_col, cur_row, view_port_top);
                 break;
             case ESC:
                 process_escape(buffer, &cur_col, &cur_row, &view_port_top, &view_port_bottom, line_count, &cur_line);
