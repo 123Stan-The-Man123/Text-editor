@@ -331,8 +331,15 @@ struct Node* process_input(struct Node* buffer)
                     cur_col = 0;
                 } else
                     cur_line = remove_node(buffer, cur_row);
-                if (cur_row == line_count-1 && cur_row > 0)
+                if (cur_row == line_count-1 && cur_row > 0) {
                     cur_row--;
+                    if (cur_row - view_port_top < 5 && view_port_top > 0) {
+                        view_port_top--;
+                        view_port_bottom--;
+                    }
+                }
+                if (cur_col > cur_line->buffer.len)
+                    cur_col = cur_line->buffer.len;
                 print_lines(buffer, view_port_top, view_port_bottom);
                 align_cur(cur_col, cur_row, view_port_top);
                 break;
