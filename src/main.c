@@ -57,22 +57,34 @@ void align_cur(int, int, int);
 char* split_line(struct Node*, int, char*);
 struct Node* process_input(struct Node*);
 void process_escape(struct Node*, int*, int*, int*, int*, int, struct Node**);
+struct Node* load_file(struct Node*, FILE*);
 
 int main(int argc, char **argv)
 {
+    if (argc != 2) {
+        printf("Use: bin/main [FILE_NAME]\n");
+        return 1;
+    }
+
     struct Node* buffer;
-    if (argc == 1)
-        buffer = init_node("\0");
-    else
-        ; // TODO: Open file and load text into the linked list, or if the file does not exist, initialise empty linked list
 
     struct termios orig_term;
     if (enable_raw_mode(&orig_term) == -1)
         return 1;
+    
+    FILE* file_ptr = fopen(argv[1], "r");
+
+    if (file_ptr != NULL)
+        buffer = load_file(buffer, file_ptr);
+    else
+        buffer = init_node("\0");
 
     buffer = process_input(buffer);
 
     disable_raw_mode(&orig_term);
+
+    if (argc == 1)
+        // TODO: Write contents of buffer to file
 
     free_buffer(buffer);
 
@@ -426,4 +438,23 @@ void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int* view_p
             *cur_col -= (*cur_col > 0) ? 1 : 0;
             break;
     }
+}
+
+struct Node* load_file(struct Node* buffer, FILE* file_ptr)
+{
+    char c;
+    int row = 0, column = 0;
+    buffer = init_node("\0");
+    struct Node* cur_line = buffer;
+
+    while ((c = getc(file_ptr)) != EOF) {
+        if (c == '\n') {
+            cur_line = add_node(buffer, "\0", row++);
+            column = 0;
+        } else
+            add_char(cur_line, &column, c);
+    }
+    print_lines(buffer, 0, row);
+    align_cur(0, 0, 0);
+    return buffer;
 }
