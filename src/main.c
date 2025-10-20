@@ -186,7 +186,7 @@ struct Node* remove_node(struct Node* node, int location)
     if (node->next == NULL && i == 0) {
         node->buffer.buff[0] = '\0';
         node->buffer.len = 0;
-    } else if (location == 0 && node->next != NULL) {
+    } else if (i == 0 && node->next != NULL) {
         node = node->next;
         free_node(prev);
     } else if (node->next == NULL && i > 0) {
@@ -327,8 +327,14 @@ struct Node* process_input(struct Node* buffer)
                 running = 0;
                 break;
             case CTRL_K:
-                // TODO: Add buffer logic to remove a line from the linked list
-                printf(ERASE_LINE);
+                if (cur_row == 0)
+                    buffer = remove_node(buffer, cur_row);
+                else
+                    remove_node(buffer, cur_row);
+                if (cur_row == line_count-1 && cur_row > 0)
+                    cur_row--;
+                print_lines(buffer, view_port_top, view_port_bottom);
+                align_cur(cur_col, cur_row, view_port_top);
                 break;
             case '\r':
                 printf("\r\n");
@@ -373,26 +379,30 @@ void process_escape(struct Node* buffer, int* cur_col, int* cur_row, int* view_p
                 printf(CURSOR_UP);
                 (*cur_row)--;
                 *cur_line = get_line(buffer, *cur_row);
+                if (*cur_col > (*cur_line)->buffer.len)
+                    *cur_col = (*cur_line)->buffer.len;
             }
             if (*cur_row - *view_port_top < 5 && *view_port_top > 0) {
                 (*view_port_top)--;
                 (*view_port_bottom)--;
                 print_lines(buffer, *view_port_top, *view_port_bottom);
-                align_cur(*cur_col, *cur_row, *view_port_top);
             }
+            align_cur(*cur_col, *cur_row, *view_port_top);
             break;
         case 'B':
             if (*cur_row < line_count-1) {
                 printf(CURSOR_DOWN);
                 (*cur_row)++;
                 *cur_line = get_line(buffer, *cur_row);
+                if (*cur_col > (*cur_line)->buffer.len)
+                    *cur_col = (*cur_line)->buffer.len;
             }
             if (*view_port_bottom - *cur_row < 5 && *view_port_bottom < line_count) {
                 (*view_port_top)++;
                 (*view_port_bottom)++;
                 print_lines(buffer, *view_port_top, *view_port_bottom);
-                align_cur(*cur_col, *cur_row, *view_port_top);
             }
+            align_cur(*cur_col, *cur_row, *view_port_top);
             break;
         case 'C':
             if (*cur_col < (*cur_line)->buffer.len) {
