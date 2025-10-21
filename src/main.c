@@ -325,7 +325,7 @@ struct Node* process_input(struct Node* buffer)
 {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = w.ws_row;
+    int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = w.ws_row-1;
     struct Node* cur_line = get_line(buffer, cur_row);
 
     print_lines(buffer, view_port_top, view_port_bottom);
