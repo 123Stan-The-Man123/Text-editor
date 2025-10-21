@@ -17,13 +17,10 @@
 
 // ASCII codes
 #define CTRL_D 4
+#define CTRL_E 5
 #define CTRL_Q 17
 #define ESC 27
 #define BACK_SPACE 127
-
-// Test codes (to be removed)
-#define CTRL_T 20
-#define CTRL_U 21
 
 #define INITIAL_LINE_SIZE 25
 
@@ -66,7 +63,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    struct Node* buffer;
+    struct Node* buffer = init_node("\0");
 
     struct termios orig_term;
     if (enable_raw_mode(&orig_term) == -1)
@@ -76,8 +73,6 @@ int main(int argc, char **argv)
 
     if (file_ptr != NULL)
         buffer = load_file(buffer, file_ptr);
-    else
-        buffer = init_node("\0");
 
     buffer = process_input(buffer);
 
@@ -258,7 +253,7 @@ void shift_right(struct Node* line, int cur_col)
 
 void add_char(struct Node* line, int* cur_col, char c)
 {
-    if ((*cur_col + 1) >= line->buffer.capacity)
+    if (line->buffer.len + 1 >= line->buffer.capacity)
         increase_line_capacity(line);
 
     if (*cur_col == line->buffer.len) {
@@ -323,8 +318,9 @@ struct Node* process_input(struct Node* buffer)
 {
     int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = 28;
     struct Node* cur_line = get_line(buffer, cur_row);
-    // Test variable (to be removed)
-    struct Node* temp;
+
+    print_lines(buffer, view_port_top, view_port_bottom);
+    align_cur(cur_col, cur_row, view_port_top);
 
     for (int running = 1; running;) {
         char c = getc(stdin);
@@ -355,9 +351,12 @@ struct Node* process_input(struct Node* buffer)
                 print_lines(buffer, view_port_top, view_port_bottom);
                 align_cur(cur_col, cur_row, view_port_top);
                 break;
+            case CTRL_E:
+                cur_col = cur_line->buffer.len;
+                align_cur(cur_col, cur_row, view_port_top);
+                break;
             case '\r':
-                cur_line = add_node(buffer, split_line(cur_line, cur_col, new_line), cur_row);
-                cur_row++;
+                cur_line = add_node(buffer, split_line(cur_line, cur_col, new_line), cur_row++);
                 cur_col = 0;
                 if (view_port_bottom - cur_row < 5 && view_port_bottom <= line_count) {
                     view_port_top++;
@@ -444,7 +443,6 @@ struct Node* load_file(struct Node* buffer, FILE* file_ptr)
 {
     char c;
     int row = 0, column = 0;
-    buffer = init_node("\0");
     struct Node* cur_line = buffer;
 
     while ((c = getc(file_ptr)) != EOF) {
@@ -454,7 +452,5 @@ struct Node* load_file(struct Node* buffer, FILE* file_ptr)
         } else
             add_char(cur_line, &column, c);
     }
-    print_lines(buffer, 0, row);
-    align_cur(0, 0, 0);
     return buffer;
 }
