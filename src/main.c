@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -55,6 +56,7 @@ char* split_line(struct Node*, int, char*);
 struct Node* process_input(struct Node*);
 void process_escape(struct Node*, int*, int*, int*, int*, int, struct Node**);
 struct Node* load_file(struct Node*, FILE*);
+void save_file(struct Node*, FILE*);
 
 int main(int argc, char **argv)
 {
@@ -71,15 +73,20 @@ int main(int argc, char **argv)
     
     FILE* file_ptr = fopen(argv[1], "r");
 
-    if (file_ptr != NULL)
+    if (file_ptr != NULL) {
         buffer = load_file(buffer, file_ptr);
+        fclose(file_ptr);
+    }
 
     buffer = process_input(buffer);
 
     disable_raw_mode(&orig_term);
 
-    if (argc == 1)
-        // TODO: Write contents of buffer to file
+    if (argc == 2) {
+        file_ptr = fopen(argv[1], "w+");
+        save_file(buffer, file_ptr);
+        fclose(file_ptr);
+    }
 
     free_buffer(buffer);
 
@@ -316,7 +323,9 @@ char* split_line(struct Node* line, int cur_col, char* new_line)
 
 struct Node* process_input(struct Node* buffer)
 {
-    int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = 28;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int cur_col = 0, cur_row = 0, view_port_top = 0, view_port_bottom = w.ws_row;
     struct Node* cur_line = get_line(buffer, cur_row);
 
     print_lines(buffer, view_port_top, view_port_bottom);
@@ -453,4 +462,13 @@ struct Node* load_file(struct Node* buffer, FILE* file_ptr)
             add_char(cur_line, &column, c);
     }
     return buffer;
+}
+
+void save_file(struct Node* buffer, FILE* file_ptr)
+{
+    while (buffer != NULL) {
+        fputs(buffer->buffer.buff, file_ptr);
+        fputs("\n", file_ptr);
+        buffer = buffer->next;
+    }
 }
