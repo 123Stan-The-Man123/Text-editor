@@ -468,7 +468,8 @@ void save_file(struct Node* buffer, FILE* file_ptr)
 {
     while (buffer != NULL) {
         fputs(buffer->buffer.buff, file_ptr);
-        fputs("\n", file_ptr);
+        if (buffer->next != NULL)
+            fputs("\n", file_ptr);
         buffer = buffer->next;
     }
 }
