@@ -24,6 +24,7 @@
 #define BACK_SPACE 127
 
 #define INITIAL_LINE_SIZE 25
+#define TABSTOP 4
 
 struct Line {
     char* buff;
@@ -335,6 +336,7 @@ struct Node* process_input(struct Node* buffer)
         char c = getc(stdin);
         char new_line[cur_line->buffer.len];
         int line_count = count_lines(buffer);
+        int len;
         switch (c) {
             case CTRL_Q:
                 running = 0;
@@ -371,6 +373,13 @@ struct Node* process_input(struct Node* buffer)
                     view_port_top++;
                     view_port_bottom++;
                 }
+                print_lines(buffer, view_port_top, view_port_bottom);
+                align_cur(cur_col, cur_row, view_port_top);
+                break;
+            case '\t':
+                len = buffer->buffer.len+1;
+                for (int i = 0; i <= len % TABSTOP; i++)
+                    add_char(cur_line, &cur_col, ' ');
                 print_lines(buffer, view_port_top, view_port_bottom);
                 align_cur(cur_col, cur_row, view_port_top);
                 break;
